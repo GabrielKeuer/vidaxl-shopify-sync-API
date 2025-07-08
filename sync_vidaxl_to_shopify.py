@@ -36,6 +36,8 @@ def hent_vidaxl():
         offset += BATCH_SIZE
         sleep(1)
     df = pd.DataFrame(all_products)
+    # Version B: Udelad kun produkter hvor PRIS = 0 OG LAGER = 0 (ellers behold)
+    df = df[(df['price'].astype(float) > 0) | (df['quantity'].astype(float) > 0)]
     return df[['code', 'price', 'quantity', 'updated_at']].rename(columns={
         'code': 'SKU',
         'price': 'B2B price',
@@ -49,8 +51,6 @@ def hent_shopify_variants():
         "X-Shopify-Access-Token": SHOPIFY_TOKEN,
         "Content-Type": "application/json"
     }
-    # Query for alle varianter (kun SKU, ID, pris, cost, lager)
-    # For demo – for rigtigt bulk bør du bruge Bulk API!
     query = '''
     {
       productVariants(first: 250) {
@@ -83,14 +83,12 @@ def hent_shopify_variants():
     return pd.DataFrame(variants)
 
 def beregn_salgspris(cost):
-    # Juster til din egen prisregel
     return round(cost * 1.6)
 
 def delta_detection(df_vidaxl, df_shopify):
     df = pd.merge(df_vidaxl, df_shopify, on='SKU', how='inner', suffixes=('_vidaxl', '_shopify'))
     to_update = []
     for _, row in df.iterrows():
-        # Find forskelle
         lager_ændret = row['Stock_vidaxl'] != row['inventoryQuantity']
         pris_ændret = row['B2B price_vidaxl'] != row['cost']
         mutation = {}
@@ -114,13 +112,11 @@ def delta_detection(df_vidaxl, df_shopify):
 def main():
     print("Henter vidaXL...")
     df_vidaxl = hent_vidaxl()
+    print("Antal AKTIVE produkter fra vidaXL (pris>0 eller lager>0):", len(df_vidaxl))
     print("Henter Shopify varianter...")
     df_shopify = hent_shopify_variants()
     print("Sammenligner og danner mutationsliste...")
     mutations = delta_detection(df_vidaxl, df_shopify)
-    # Her skal du bygge mutationer til Shopify Bulk API (jsonl eller graphql) og uploade.
-    print(f"Antal varianter der skal opdateres: {len(mutations)}")
-    # For demo, gem til fil:
     pd.DataFrame(mutations).to_csv("shopify_mutations.csv", index=False, encoding='utf-8-sig')
     print("Klar til upload til Shopify Bulk API!")
 
