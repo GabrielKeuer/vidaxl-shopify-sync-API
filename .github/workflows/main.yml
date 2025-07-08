@@ -1,0 +1,25 @@
+name: Run vidaxl-shopify sync
+
+on:
+  schedule:
+    - cron: "0 */2 * * *"   # Kører hver 2. time (kan ændres)
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Run script
+        env:
+          VIDAXL_EMAIL: ${{ secrets.VIDAXL_EMAIL }}
+          VIDAXL_API_KEY: ${{ secrets.VIDAXL_API_KEY }}
+          SHOPIFY_TOKEN: ${{ secrets.SHOPIFY_TOKEN }}
+          SHOPIFY_SHOP: ${{ secrets.SHOPIFY_SHOP }}
+        run: python sync_vidaxl_to_shopify.py
